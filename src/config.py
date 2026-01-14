@@ -31,13 +31,19 @@ class Settings(BaseSettings):
     model_temperature: float = 0.7
     max_tokens: int = 1000
 
+    # Gemini Configuration
+    gemini_model: str = "gemini-3-flash-preview"
+    gemini_api_key: Optional[str] = None
+
     # Security
     api_key: Optional[str] = None
+    openai_api_key: Optional[str] = None
 
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
         case_sensitive=False,
+        extra="ignore",  # Allow unknown env vars
     )
 
 
