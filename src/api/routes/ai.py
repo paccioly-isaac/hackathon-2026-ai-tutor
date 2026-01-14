@@ -31,6 +31,12 @@ def get_graph():
     return _graph
 
 
+class QuestionAnswer(BaseModel):
+    """A student's answer to a question."""
+    questionId: str = Field(..., description="ID of the question being answered")
+    selectedOptionId: str = Field(..., description="ID of the selected option (A, B, C, D)")
+
+
 # Pydantic models for request/response
 class AskRequest(BaseModel):
     """Request to ask the AI tutor a question."""
@@ -39,6 +45,22 @@ class AskRequest(BaseModel):
     context: Optional[str] = Field(default=None, description="Additional context for the question")
     temperature: Optional[float] = Field(default=None, description="Model temperature override")
     user_id: str = Field(default="hackathon_judge", description="User identifier (mocked)")
+    question_answers: Optional[List[QuestionAnswer]] = Field(default=None, description="Answers to multiple choice questions")
+
+
+class QuestionOption(BaseModel):
+    """A single option for a multiple-choice question."""
+    id: str
+    text: str
+    isCorrect: bool
+
+
+class Question(BaseModel):
+    """A multiple-choice question."""
+    id: str
+    question: str
+    options: List[QuestionOption]
+    explanation: str
 
 
 class AskResponse(BaseModel):
@@ -49,6 +71,8 @@ class AskResponse(BaseModel):
     session_id: str
     cited_paragraphs: List[str] = Field(default_factory=list, description="Cited paragraphs from retrieved content")
     waiting_for_input: bool = Field(default=False, description="Whether the agent is waiting for more input")
+    questions: List[Question] = Field(default_factory=list, description="Multiple choice questions to display")
+    questions_title: Optional[str] = Field(default=None, description="Title for the questions set")
 
 
 class ErrorResponse(BaseModel):
@@ -84,11 +108,19 @@ async def ask_tutor(request: AskRequest) -> AskResponse:
         graph = get_graph()
         config = {"configurable": {"thread_id": request.session_id}}
         
+        # Build the message content, including question answers if provided
+        message_content = request.question
+        if request.question_answers:
+            answers_text = "\n\n[Question Answers]\n"
+            for ans in request.question_answers:
+                answers_text += f"- Question {ans.questionId}: Selected option {ans.selectedOptionId}\n"
+            message_content = message_content + answers_text if message_content else answers_text.strip()
+        
         # Create user message
         user_message: Message = {
             "role": "user",
-            "content": request.question,
-            "id": f"msg_{request.session_id}_{len(request.question)}"
+            "content": message_content,
+            "id": f"msg_{request.session_id}_{len(message_content)}"
         }
         
         # Check if this is a new conversation or resuming
@@ -118,12 +150,24 @@ async def ask_tutor(request: AskRequest) -> AskResponse:
         messages = result.get("conversation_state", {}).get("messages", [])
         graph_status = result.get("status", "complete")
         
-        # Find the last sendMessage tool response
+        # Find the last tool response (sendMessage or showQuestions)
         response_message = ""
         cited_paragraphs: List[str] = []
+        questions: List[Question] = []
+        questions_title: Optional[str] = None
         
         for msg in reversed(messages):
-            if msg.get("role") == "tool" and msg.get("name") == "sendMessage":
+            if msg.get("role") == "tool" and msg.get("name") == "showQuestions":
+                try:
+                    content = json.loads(msg.get("content", "{}"))
+                    response_message = content.get("message", "")
+                    questions_title = content.get("title")
+                    raw_questions = content.get("questions", [])
+                    questions = [Question(**q) for q in raw_questions]
+                    break
+                except json.JSONDecodeError:
+                    pass
+            elif msg.get("role") == "tool" and msg.get("name") == "sendMessage":
                 try:
                     content = json.loads(msg.get("content", "{}"))
                     response_message = content.get("message", "")
@@ -134,7 +178,7 @@ async def ask_tutor(request: AskRequest) -> AskResponse:
                     break
         
         # If no sendMessage found, check for assistant message
-        if not response_message:
+        if not response_message and not questions:
             for msg in reversed(messages):
                 if msg.get("role") == "assistant" and msg.get("content"):
                     response_message = msg.get("content", "")
@@ -142,8 +186,10 @@ async def ask_tutor(request: AskRequest) -> AskResponse:
         
         return AskResponse(
             session_id=request.session_id,
-            answer=response_message or "I'm processing your request...",
+            answer=response_message or "",
             cited_paragraphs=cited_paragraphs,
+            questions=questions,
+            questions_title=questions_title,
             waiting_for_input=graph_status == "waiting_for_input",
             model_used="gemini-3-flash-preview",
             tokens_used=0 # Placeholder

@@ -4,9 +4,10 @@ import type { KeyboardEvent } from 'react';
 interface ChatInputProps {
   onSendMessage: (message: string) => void;
   disabled: boolean;
+  pendingAnswersCount: number;
 }
 
-export const ChatInput = ({ onSendMessage, disabled }: ChatInputProps) => {
+export const ChatInput = ({ onSendMessage, disabled, pendingAnswersCount }: ChatInputProps) => {
   const [message, setMessage] = useState('');
 
   const handleSend = () => {
@@ -49,13 +50,17 @@ export const ChatInput = ({ onSendMessage, disabled }: ChatInputProps) => {
           onClick={handleSend}
           disabled={disabled || !message.trim()}
           className="p-3 bg-primary hover:bg-opacity-90 text-white rounded-lg shadow-sm transition-all transform hover:scale-105 active:scale-95 flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+          title={pendingAnswersCount > 0 ? "Send message with answers" : "Send message"}
         >
           <span className="material-icons">send</span>
         </button>
       </div>
       <div className="text-center mt-2">
         <p className="text-xs text-gray-400 dark:text-gray-500">
-          AI can make mistakes. Please verify important information.
+          {pendingAnswersCount > 0 
+            ? "Your answers will be included when you send a message"
+            : "AI can make mistakes. Please verify important information."
+          }
         </p>
       </div>
     </div>

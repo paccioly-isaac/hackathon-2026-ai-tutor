@@ -6,10 +6,12 @@ from src.graphs.tools.route_to_retrieval import (
     build_route_to_questions_tool,
     build_route_to_articles_tool,
 )
+from src.graphs.tools.show_questions import build_show_questions_tool
 
 __all__ = [
     "build_send_message_tool",
     "build_wait_for_input_tool",
     "build_route_to_questions_tool",
     "build_route_to_articles_tool",
+    "build_show_questions_tool",
 ]

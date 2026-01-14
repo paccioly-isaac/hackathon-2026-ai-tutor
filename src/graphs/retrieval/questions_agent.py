@@ -18,42 +18,133 @@ from src.graphs.utils.messages import create_tool_message
 MOCK_QUESTIONS = [
     {
         "id": "q1",
-        "topic": "physics",
-        "question": "What is Newton's First Law of Motion?",
+        "topic": "história",
+        "question": "Em que ano Pedro Álvares Cabral chegou ao território que hoje conhecemos como Brasil?",
         "alternatives": [
-            "A) Force equals mass times acceleration",
-            "B) An object at rest stays at rest unless acted upon by an external force",
-            "C) For every action there is an equal and opposite reaction",
-            "D) Energy cannot be created or destroyed"
+            "A) 1492",
+            "B) 1500",
+            "C) 1530",
+            "D) 1822"
         ],
         "correct_answer": "B",
-        "explanation": "Newton's First Law states that an object at rest stays at rest and an object in motion stays in motion unless acted upon by an external force."
+        "explanation": "A esquadra de Pedro Álvares Cabral chegou ao Brasil em 22 de abril de 1500."
     },
     {
-        "id": "q2", 
-        "topic": "physics",
-        "question": "What is the formula for kinetic energy?",
+        "id": "q2",
+        "topic": "história",
+        "question": "Qual era o principal objetivo oficial da esquadra de Cabral ao zarpar de Portugal?",
         "alternatives": [
-            "A) E = mc²",
-            "B) KE = ½mv²",
-            "C) F = ma",
-            "D) P = mv"
+            "A) Explorar o interior da Amazônia",
+            "B) Colonizar a região do Rio da Prata",
+            "C) Estabelecer uma rota comercial com as Índias",
+            "D) Encontrar ouro nas Minas Gerais"
         ],
-        "correct_answer": "B",
-        "explanation": "Kinetic energy is calculated as one-half times mass times velocity squared."
+        "correct_answer": "C",
+        "explanation": "O objetivo principal da expedição era seguir para as Índias para estabelecer relações comerciais e trazer especiarias."
     },
     {
         "id": "q3",
-        "topic": "programming",
-        "question": "What is the time complexity of binary search?",
+        "topic": "história",
+        "question": "Qual foi o primeiro nome dado pelos portugueses à terra descoberta, antes de ser chamada de Brasil?",
         "alternatives": [
-            "A) O(n)",
-            "B) O(n²)",
-            "C) O(log n)",
-            "D) O(1)"
+            "A) Ilha de Vera Cruz",
+            "B) Terra de Santa Cruz",
+            "C) Província de São Vicente",
+            "D) Capitania Geral"
+        ],
+        "correct_answer": "A",
+        "explanation": "Inicialmente, acreditando tratar-se de uma ilha, os portugueses chamaram a terra de Ilha de Vera Cruz."
+    },
+    {
+        "id": "q4",
+        "topic": "história",
+        "question": "Quem era o rei de Portugal na época do descobrimento do Brasil?",
+        "alternatives": [
+            "A) D. Pedro II",
+            "B) D. João VI",
+            "C) D. Manuel I",
+            "D) D. Afonso Henriques"
         ],
         "correct_answer": "C",
-        "explanation": "Binary search divides the search space in half each iteration, resulting in logarithmic time complexity."
+        "explanation": "D. Manuel I, o Venturoso, era o monarca português no ano de 1500."
+    },
+    {
+        "id": "q5",
+        "topic": "história",
+        "question": "A famosa carta que relatava o descobrimento ao rei de Portugal foi escrita por quem?",
+        "alternatives": [
+            "A) Pedro Álvares Cabral",
+            "B) Pero Vaz de Caminha",
+            "C) Américo Vespúcio",
+            "D) Fernão de Magalhães"
+        ],
+        "correct_answer": "B",
+        "explanation": "Pero Vaz de Caminha era o escrivão da frota e escreveu a detalhada carta relatando o achamento da terra."
+    },
+    {
+        "id": "q6",
+        "topic": "história",
+        "question": "Qual foi o primeiro recurso natural explorado intensivamente pelos portugueses no litoral brasileiro?",
+        "alternatives": [
+            "A) Cana-de-açúcar",
+            "B) Ouro",
+            "C) Pau-brasil",
+            "D) Café"
+        ],
+        "correct_answer": "C",
+        "explanation": "O pau-brasil, madeira que fornecia um pigmento vermelho muito valorizado na Europa, foi o primeiro foco de exploração."
+    },
+    {
+        "id": "q7",
+        "topic": "história",
+        "question": "Como se chamava o primeiro monte avistado pela esquadra de Cabral ao se aproximar do litoral?",
+        "alternatives": [
+            "A) Pão de Açúcar",
+            "B) Monte Pascoal",
+            "C) Pico da Neblina",
+            "D) Morro do Chapéu"
+        ],
+        "correct_answer": "B",
+        "explanation": "O monte foi batizado de Monte Pascoal por ter sido avistado na época da Páscoa."
+    },
+    {
+        "id": "q8",
+        "topic": "história",
+        "question": "Que povo indígena habitava majoritariamente o litoral brasileiro no momento da chegada dos portugueses?",
+        "alternatives": [
+            "A) Incas",
+            "B) Astecas",
+            "C) Tupis/Tupinambás",
+            "D) Maias"
+        ],
+        "correct_answer": "C",
+        "explanation": "Os povos de tronco linguístico Tupi, como os Tupinambás, eram os principais habitantes do litoral em 1500."
+    },
+    {
+        "id": "q9",
+        "topic": "história",
+        "question": "Quantas embarcações faziam parte da frota original liderada por Pedro Álvares Cabral?",
+        "alternatives": [
+            "A) 3",
+            "B) 7",
+            "C) 13",
+            "D) 20"
+        ],
+        "correct_answer": "C",
+        "explanation": "A esquadra de Cabral era composta por 13 embarcações (9 naus, 3 caravelas e 1 naveta de mantimentos)."
+    },
+    {
+        "id": "q10",
+        "topic": "história",
+        "question": "Em que local do atual estado da Bahia a esquadra de Cabral aportou pela primeira vez?",
+        "alternatives": [
+            "A) Salvador",
+            "B) Porto Seguro (Cabrália)",
+            "C) Ilhéus",
+            "D) Itacaré"
+        ],
+        "correct_answer": "B",
+        "explanation": "A frota ancorou primeiro na região de Porto Seguro, especificamente na Baía de Cabrália."
     }
 ]
 

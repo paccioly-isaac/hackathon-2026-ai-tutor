@@ -22,6 +22,7 @@ from src.graphs.tools import (
     build_send_message_tool,
     build_route_to_questions_tool,
     build_route_to_articles_tool,
+    build_show_questions_tool,
 )
 from src.graphs.utils.messages import create_tool_message, get_last_message
 from src.graphs.retrieval import get_questions_agent_graph, get_articles_agent_graph
@@ -45,10 +46,13 @@ SYSTEM_PROMPT = dedent("""
     
     1. sendMessage: Send a response to the student. Include citedParagraphs when referencing retrieved content. Set interrupt=True to pause and wait for student response.
     
+    2. showQuestions: Display multiple choice questions to the student. Use this after retrieving questions with routeToQuestions. The student can answer some or all questions at their pace.
 
     3. routeToQuestions: When the student wants practice questions, use this to retrieve relevant questions.
     
     4. routeToArticles: When the student wants to learn about a topic, use this to retrieve educational content.
+
+    ATTENTION: ONLY USE THE ROUTE TOOLS ONCE PER ITERATION LOOP.
     </tools>
     
     <guidelines>
@@ -58,6 +62,10 @@ SYSTEM_PROMPT = dedent("""
     - If you need clarification, ask the student and use sendMessage with interrupt=True
     - Keep responses clear and appropriately sized
     - Respond in the same language the student uses
+    - When presenting questions, use showQuestions tool with the question IDs
+    - You can reference previous questions using [q1], [q2], [q3], etc. notation in your messages
+    - Note: When you write [q1], [q2], etc., they will be displayed to the user as interactive "Questão 1", "Questão 2", etc. badges
+    - When the student answers questions, review their answers and provide helpful feedback
     </guidelines>
 </system>
 """).strip()
@@ -69,6 +77,7 @@ def build_llm_tools(state: GraphState) -> GraphState:
         build_send_message_tool(),
         build_route_to_questions_tool(),
         build_route_to_articles_tool(),
+        build_show_questions_tool(),
     ]
     state["llm_tools"] = tools
     return state
@@ -275,6 +284,8 @@ def tool_router(state: GraphState) -> str:
         return "route_to_questions"
     elif tool_name == "routeToArticles":
         return "route_to_articles"
+    elif tool_name == "showQuestions":
+        return "handle_show_questions"
     else:
         return "end"
 
@@ -330,6 +341,167 @@ async def handle_send_message(state: GraphState) -> GraphState:
     return state
 
 
+# Mock questions storage (same as in questions_agent.py for lookup)
+QUESTIONS_DB = {
+    "q1": {
+        "id": "q1",
+        "question": "Em que ano Pedro Álvares Cabral chegou ao território que hoje conhecemos como Brasil?",
+        "options": [
+            {"id": "A", "text": "1492", "isCorrect": False},
+            {"id": "B", "text": "1500", "isCorrect": True},
+            {"id": "C", "text": "1530", "isCorrect": False},
+            {"id": "D", "text": "1822", "isCorrect": False}
+        ],
+        "explanation": "A esquadra de Pedro Álvares Cabral chegou ao Brasil em 22 de abril de 1500."
+    },
+    "q2": {
+        "id": "q2",
+        "question": "Qual era o principal objetivo oficial da esquadra de Cabral ao zarpar de Portugal?",
+        "options": [
+            {"id": "A", "text": "Explorar o interior da Amazônia", "isCorrect": False},
+            {"id": "B", "text": "Colonizar a região do Rio da Prata", "isCorrect": False},
+            {"id": "C", "text": "Estabelecer uma rota comercial com as Índias", "isCorrect": True},
+            {"id": "D", "text": "Encontrar ouro nas Minas Gerais", "isCorrect": False}
+        ],
+        "explanation": "O objetivo principal da expedição era seguir para as Índias para estabelecer relações comerciais e trazer especiarias."
+    },
+    "q3": {
+        "id": "q3",
+        "question": "Qual foi o primeiro nome dado pelos portugueses à terra descoberta, antes de ser chamada de Brasil?",
+        "options": [
+            {"id": "A", "text": "Ilha de Vera Cruz", "isCorrect": True},
+            {"id": "B", "text": "Terra de Santa Cruz", "isCorrect": False},
+            {"id": "C", "text": "Província de São Vicente", "isCorrect": False},
+            {"id": "D", "text": "Capitania Geral", "isCorrect": False}
+        ],
+        "explanation": "Inicialmente, acreditando tratar-se de uma ilha, os portugueses chamaram a terra de Ilha de Vera Cruz."
+    },
+    "q4": {
+        "id": "q4",
+        "question": "Quem era o rei de Portugal na época do descobrimento do Brasil?",
+        "options": [
+            {"id": "A", "text": "D. Pedro II", "isCorrect": False},
+            {"id": "B", "text": "D. João VI", "isCorrect": False},
+            {"id": "C", "text": "D. Manuel I", "isCorrect": True},
+            {"id": "D", "text": "D. Afonso Henriques", "isCorrect": False}
+        ],
+        "explanation": "D. Manuel I, o Venturoso, era o monarca português no ano de 1500."
+    },
+    "q5": {
+        "id": "q5",
+        "question": "A famosa carta que relatava o descobrimento ao rei de Portugal foi escrita por quem?",
+        "options": [
+            {"id": "A", "text": "Pedro Álvares Cabral", "isCorrect": False},
+            {"id": "B", "text": "Pero Vaz de Caminha", "isCorrect": True},
+            {"id": "C", "text": "Américo Vespúcio", "isCorrect": False},
+            {"id": "D", "text": "Fernão de Magalhães", "isCorrect": False}
+        ],
+        "explanation": "Pero Vaz de Caminha era o escrivão da frota e escreveu a detalhada carta relatando o achamento da terra."
+    },
+    "q6": {
+        "id": "q6",
+        "question": "Qual foi o primeiro recurso natural explorado intensivamente pelos portugueses no litoral brasileiro?",
+        "options": [
+            {"id": "A", "text": "Cana-de-açúcar", "isCorrect": False},
+            {"id": "B", "text": "Ouro", "isCorrect": False},
+            {"id": "C", "text": "Pau-brasil", "isCorrect": True},
+            {"id": "D", "text": "Café", "isCorrect": False}
+        ],
+        "explanation": "O pau-brasil, madeira que fornecia um pigmento vermelho muito valorizado na Europa, foi o primeiro foco de exploração."
+    },
+    "q7": {
+        "id": "q7",
+        "question": "Como se chamava o primeiro monte avistado pela esquadra de Cabral ao se aproximar do litoral?",
+        "options": [
+            {"id": "A", "text": "Pão de Açúcar", "isCorrect": False},
+            {"id": "B", "text": "Monte Pascoal", "isCorrect": True},
+            {"id": "C", "text": "Pico da Neblina", "isCorrect": False},
+            {"id": "D", "text": "Morro do Chapéu", "isCorrect": False}
+        ],
+        "explanation": "O monte foi batizado de Monte Pascoal por ter sido avistado na época da Páscoa."
+    },
+    "q8": {
+        "id": "q8",
+        "question": "Que povo indígena habitava majoritariamente o litoral brasileiro no momento da chegada dos portugueses?",
+        "options": [
+            {"id": "A", "text": "Incas", "isCorrect": False},
+            {"id": "B", "text": "Astecas", "isCorrect": False},
+            {"id": "C", "text": "Tupis/Tupinambás", "isCorrect": True},
+            {"id": "D", "text": "Maias", "isCorrect": False}
+        ],
+        "explanation": "Os povos de tronco linguístico Tupi, como os Tupinambás, eram os principais habitantes do litoral em 1500."
+    },
+    "q9": {
+        "id": "q9",
+        "question": "Quantas embarcações faziam parte da frota original liderada por Pedro Álvares Cabral?",
+        "options": [
+            {"id": "A", "text": "3", "isCorrect": False},
+            {"id": "B", "text": "7", "isCorrect": False},
+            {"id": "C", "text": "13", "isCorrect": True},
+            {"id": "D", "text": "20", "isCorrect": False}
+        ],
+        "explanation": "A esquadra de Cabral era composta por 13 embarcações (9 naus, 3 caravelas e 1 naveta de mantimentos)."
+    },
+    "q10": {
+        "id": "q10",
+        "question": "Em que local do atual estado da Bahia a esquadra de Cabral aportou pela primeira vez?",
+        "options": [
+            {"id": "A", "text": "Salvador", "isCorrect": False},
+            {"id": "B", "text": "Porto Seguro (Cabrália)", "isCorrect": True},
+            {"id": "C", "text": "Ilhéus", "isCorrect": False},
+            {"id": "D", "text": "Itacaré", "isCorrect": False}
+        ],
+        "explanation": "A frota ancorou primeiro na região de Porto Seguro, especificamente na Baía de Cabrália."
+    }
+}
+
+
+async def handle_show_questions(state: GraphState) -> GraphState:
+    """Handle showQuestions tool call."""
+    logger.info("📝 Handling showQuestions")
+    messages = state["conversation_state"]["messages"]
+    assistant_msg = get_last_message(messages, "assistant")
+    
+    if not assistant_msg or not assistant_msg.get("tool_calls"):
+        return state
+    
+    tool_call = assistant_msg["tool_calls"][0]
+    tool_call_id = tool_call["id"]
+    arguments = json.loads(tool_call["function"]["arguments"])
+    
+    question_ids = arguments.get("questionIds", [])
+    title = arguments.get("title", "Questions")
+    message = arguments.get("message", "")
+    
+    # Look up questions from the mock database
+    questions = []
+    for qid in question_ids:
+        if qid in QUESTIONS_DB:
+            questions.append(QUESTIONS_DB[qid])
+        else:
+            logger.warning(f"Question {qid} not found in database")
+    
+    # Create response with questions data
+    response_content = json.dumps({
+        "type": "questions",
+        "title": title,
+        "message": message,
+        "questions": questions
+    })
+    
+    tool_response = create_tool_message(
+        content=response_content,
+        role="tool",
+        tool_call_id=tool_call_id,
+        name="showQuestions"
+    )
+    
+    state["conversation_state"]["messages"].append(tool_response)
+    logger.success(f"✅ Showing {len(questions)} questions")
+    
+    return state
+
+
 def wait_for_input(state: GraphState) -> GraphState:
     """Pause graph and wait for user input."""
     # Trigger interrupt - graph will pause here
@@ -368,6 +540,7 @@ def get_main_graph(checkpointer: Any = None) -> StateGraph:
     graph.add_node("build_tools", build_llm_tools)
     graph.add_node("agent", agent_node)
     graph.add_node("handle_send_message", handle_send_message)
+    graph.add_node("handle_show_questions", handle_show_questions)
     graph.add_node("wait_for_input", wait_for_input)
     graph.add_node("route_to_questions", questions_graph)
     graph.add_node("route_to_articles", articles_graph)
@@ -382,6 +555,7 @@ def get_main_graph(checkpointer: Any = None) -> StateGraph:
         tool_router,
         {
             "handle_send_message": "handle_send_message",
+            "handle_show_questions": "handle_show_questions",
             "route_to_questions": "route_to_questions",
             "route_to_articles": "route_to_articles",
             "end": END
@@ -397,6 +571,9 @@ def get_main_graph(checkpointer: Any = None) -> StateGraph:
             "agent": "agent"
         }
     )
+    
+    # After showing questions, always wait for input
+    graph.add_edge("handle_show_questions", "wait_for_input")
     
     # After waiting, go back to agent
     graph.add_edge("wait_for_input", "agent")

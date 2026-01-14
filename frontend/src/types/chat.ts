@@ -1,3 +1,21 @@
+export interface QuestionOption {
+  id: string;
+  text: string;
+  isCorrect: boolean;
+}
+
+export interface Question {
+  id: string;
+  question: string;
+  options: QuestionOption[];
+  explanation: string;
+}
+
+export interface QuestionAnswer {
+  questionId: string;
+  selectedOptionId: string;
+}
+
 export interface ChatMessage {
   message: string;
   metadata: {
@@ -7,6 +25,8 @@ export interface ChatMessage {
     message_id: string;
     session_id: string;
   };
+  questions?: Question[];  // Questions to display with this message
+  questionsTitle?: string; // Title for the questions set
 }
 
 export interface TutorRequest {
@@ -14,12 +34,15 @@ export interface TutorRequest {
   context?: string;
   temperature?: number;
   session_id: string;      // Added to track conversation
+  question_answers?: QuestionAnswer[];  // Answers to questions
 }
 
 export interface TutorResponse {
   answer: string;
   model_used: string;
   tokens_used?: number;
+  questions?: Question[];  // Questions from the response
+  questions_title?: string; // Title for the questions set
 }
 
 export interface ChatState {
@@ -27,4 +50,6 @@ export interface ChatState {
   isLoading: boolean;
   error: string | null;
   sessionId: string;
+  pendingAnswers: QuestionAnswer[];  // Answers waiting to be sent
+  submittedAnswers: QuestionAnswer[];  // Answers already submitted (locked)
 }

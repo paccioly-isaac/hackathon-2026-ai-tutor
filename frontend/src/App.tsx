@@ -7,7 +7,18 @@ import { TypingIndicator } from './components/TypingIndicator';
 import { useEffect, useRef } from 'react';
 
 function App() {
-  const { messages, isLoading, error, sendMessage, clearError } = useChat();
+  const { 
+    messages, 
+    isLoading, 
+    error, 
+    sendMessage, 
+    submitAnswersOnly,
+    setPendingAnswers,
+    pendingAnswers,
+    submittedAnswers,
+    allQuestions,
+    clearError 
+  } = useChat();
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll to bottom when new messages arrive
@@ -42,7 +53,7 @@ function App() {
           <div className="space-y-6">
             {messages.length === 0 && (
               <div className="flex flex-col items-center justify-center h-full text-center py-12">
-                <span className="material-icons text-6xl text-gray-300 dark:text-gray-600 mb-4">
+                <span className="material-icons text-6xl text-secondary/30 mb-4">
                   chat_bubble_outline
                 </span>
                 <h2 className="text-2xl font-semibold text-gray-700 dark:text-gray-300 mb-2">
@@ -54,8 +65,17 @@ function App() {
               </div>
             )}
 
-            {messages.map((msg) => (
-              <ChatMessage key={msg.metadata.message_id} message={msg} />
+            {messages.map((msg, idx) => (
+              <ChatMessage 
+                key={msg.metadata.message_id} 
+                message={msg} 
+                allQuestions={allQuestions}
+                onAnswersChange={msg.questions && msg.questions.length > 0 ? setPendingAnswers : undefined}
+                onSubmitAnswers={msg.questions && msg.questions.length > 0 ? submitAnswersOnly : undefined}
+                existingAnswers={pendingAnswers}
+                lockedAnswers={submittedAnswers}
+                isLoading={isLoading}
+              />
             ))}
 
             {isLoading && <TypingIndicator />}
@@ -63,7 +83,11 @@ function App() {
           </div>
         </div>
 
-        <ChatInput onSendMessage={sendMessage} disabled={isLoading} />
+        <ChatInput 
+          onSendMessage={sendMessage} 
+          disabled={isLoading} 
+          pendingAnswersCount={pendingAnswers.length}
+        />
       </main>
     </div>
   );

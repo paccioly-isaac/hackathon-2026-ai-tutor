@@ -5,11 +5,13 @@ export default {
   theme: {
     extend: {
       colors: {
-        primary: '#0D9488',        // Teal-600
-        'background-light': '#F3F4F6',
-        'background-dark': '#111827',
+        primary: '#2b72c9',          // Vibrant blue
+        secondary: '#2b72c9',        // Same blue for consistency
+        accent: '#f15941',           // Coral/orange accent
+        'background-light': '#f8fafc',
+        'background-dark': '#061636', // Deep navy dark mode
         'surface-light': '#FFFFFF',
-        'surface-dark': '#1F2937',
+        'surface-dark': '#0d2147',   // Slightly lighter navy for surfaces
       },
       fontFamily: {
         display: ['Inter', 'sans-serif'],
