@@ -1,6 +1,4 @@
 import os
-import sys
-from pathlib import Path
 from typing import Any
 
 from dotenv import load_dotenv
@@ -9,9 +7,14 @@ from pymongo.server_api import ServerApi
 
 from loguru import logger
 
-# Add parent directory to path to import from src
-sys.path.insert(0, str(Path(__file__).parent.parent))
-from retrieval.embedding_generation import Embedder
+from src.retrieval.embedding_generation import Embedder
+
+from src.database.db_types import (
+    ContentInput,
+    QuestionInput,
+    ContentOutput,
+    QuestionOutput
+)
 
 
 def connect_to_mongo(input_uri):

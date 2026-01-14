@@ -12,6 +12,7 @@ from fastapi.responses import JSONResponse
 
 from src.config import settings
 from src.api.routes import ai
+from src.models.schemas import HealthResponse
 
 
 class AITutorException(Exception):
@@ -92,11 +93,32 @@ async def general_exception_handler(request: Request, exc: Exception) -> JSONRes
 app.include_router(ai.router, prefix=settings.api_v1_prefix)
 
 
-# Health check endpoint
-@app.get("/health", tags=["health"])
-async def health_check() -> dict:
+# Health check endpoints
+@app.get("/health", tags=["health"], response_model=HealthResponse)
+async def health_check() -> HealthResponse:
     """Health check endpoint."""
-    return {"status": "healthy", "version": settings.app_version}
+    return HealthResponse(
+        status="healthy",
+        version=settings.app_version,
+        model_loaded=True,  # In production, check if models are actually loaded
+    )
+
+
+@app.get("/api/v1/health", tags=["health"], response_model=HealthResponse)
+async def health_check_v1() -> HealthResponse:
+    """Health check endpoint (API v1)."""
+    return HealthResponse(
+        status="healthy",
+        version=settings.app_version,
+        model_loaded=True,
+    )
+
+
+@app.get("/api/v1/ready", tags=["health"])
+async def readiness_check() -> dict:
+    """Readiness check endpoint."""
+    # In production, check database connections, model loading, etc.
+    return {"status": "ready"}
 
 
 # Root endpoint
