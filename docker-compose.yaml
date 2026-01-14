@@ -23,22 +23,9 @@ services:
       OPENAI_API_KEY: ${OPENAI_API_KEY}
       GOOGLE_API_KEY: ${GOOGLE_API_KEY}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-${GOOGLE_API_KEY}}
-      ARIZE_COLLECTOR_ENDPOINT: http://phoenix-hackathon-2026:4317
+      
       # OpenTelemetry configuration for DEADLINE_EXCEEDED fix
       # OTLP Exporter timeouts (increased from default 10000ms to 30000ms)
-      OTEL_EXPORTER_OTLP_TRACES_TIMEOUT: "30000"
-      OTEL_EXPORTER_OTLP_TIMEOUT: "30000"
       # PYTHONPATH for src.* imports
       PYTHONPATH: /usr/src/app
-    depends_on:
-      - phoenix-hackathon-2026
-    restart: always
-
-  phoenix-hackathon-2026:
-    image: arizephoenix/phoenix:latest
-    container_name: phoenix-hackathon-2026
-    hostname: phoenix-hackathon-2026
-    ports:
-      - "6006:6006" # UI and OTLP HTTP collector
-      - "4317:4317" # OTLP gRPC collector
     restart: always
