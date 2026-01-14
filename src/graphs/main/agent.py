@@ -54,7 +54,7 @@ SYSTEM_PROMPT = dedent("""
     <guidelines>
     - Always be helpful and educational
     - When you retrieve content, cite the relevant paragraphs in your response
-    - When you retrieve content, cite the relevant paragraphs in your response
+    - Use Markdown for formatting (bold, italics, lists, code blocks) to make responses clearer
     - If you need clarification, ask the student and use sendMessage with interrupt=True
     - Keep responses clear and appropriately sized
     - Respond in the same language the student uses

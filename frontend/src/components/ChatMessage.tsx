@@ -1,4 +1,6 @@
 import { format } from 'date-fns';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import type { ChatMessage as ChatMessageType } from '../types/chat';
 
 interface ChatMessageProps {
@@ -19,8 +21,10 @@ export const ChatMessage = ({ message }: ChatMessageProps) => {
         />
         <div className="flex flex-col gap-1 items-end max-w-[80%]">
           <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">You</span>
-          <div className="bg-primary text-white p-4 rounded-2xl rounded-tr-none shadow-sm leading-relaxed">
-            <p>{message.message}</p>
+          <div className="bg-primary text-white p-4 rounded-2xl rounded-tr-none shadow-sm leading-relaxed prose prose-sm max-w-none prose-invert prose-p:text-white prose-headings:text-white prose-strong:text-white prose-a:text-white">
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+              {message.message}
+            </ReactMarkdown>
           </div>
           <span className="text-xs text-gray-400 dark:text-gray-500">{formattedTime}</span>
         </div>
@@ -35,8 +39,10 @@ export const ChatMessage = ({ message }: ChatMessageProps) => {
       </div>
       <div className="flex flex-col gap-1 max-w-[80%]">
         <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">EduBot</span>
-        <div className="bg-surface-light dark:bg-surface-dark p-4 rounded-2xl rounded-tl-none shadow-sm border border-gray-100 dark:border-gray-700 text-gray-800 dark:text-gray-200 leading-relaxed">
-          <p>{message.message}</p>
+        <div className="bg-surface-light dark:bg-surface-dark p-4 rounded-2xl rounded-tl-none shadow-sm border border-gray-100 dark:border-gray-700 text-gray-800 dark:text-gray-200 leading-relaxed prose prose-sm max-w-none dark:prose-invert">
+          <ReactMarkdown remarkPlugins={[remarkGfm]}>
+            {message.message}
+          </ReactMarkdown>
         </div>
         <span className="text-xs text-gray-400 dark:text-gray-500">{formattedTime}</span>
       </div>
