@@ -121,7 +121,7 @@ async def agent_node(state: GraphState) -> GraphState:
         elif role == "tool":
             # Tool response
             gemini_messages.append({
-                "role": "user",
+                "role": "function",
                 "parts": [{
                     "functionResponse": {
                         "name": msg.get("name", "tool"),
@@ -138,28 +138,10 @@ async def agent_node(state: GraphState) -> GraphState:
         if not gemini_messages:
              # Should not happen in normal flow
              raise ValueError("No messages to send")
-             
-        history = gemini_messages[:-1]
-        last_msg = gemini_messages[-1]
         
-        # Extract content from last message
-        # send_message expects str or Part, not a list of parts
-        parts = last_msg.get("parts", [])
-        if parts and len(parts) == 1:
-            part = parts[0]
-            if "text" in part:
-                message_content = part["text"]
-            else:
-                # For function responses or other part types, use the whole message
-                message_content = last_msg
-        else:
-            # Multiple parts - pass the whole message content
-            message_content = last_msg
-        
-        logger.info(f"📤 Calling Gemini with {len(history)} history messages")
-        response = await client.send_chat_message(
-            history=history,
-            message=message_content,
+        logger.info(f"📤 Calling Gemini with {len(gemini_messages)} messages")
+        response = await client.call_llm(
+            call_content=gemini_messages,
             system_instruction=SYSTEM_PROMPT,
             model=settings.gemini_model,
             tools=state["llm_tools"],
@@ -297,6 +279,22 @@ def tool_router(state: GraphState) -> str:
         return "end"
 
 
+def post_send_message_router(state: GraphState) -> str:
+    """Decide next step after sending message."""
+    messages = state["conversation_state"]["messages"]
+    assistant_msg = get_last_message(messages, "assistant")
+    
+    if not assistant_msg or not assistant_msg.get("tool_calls"):
+        return "agent"
+        
+    tool_call = assistant_msg["tool_calls"][0]
+    arguments = json.loads(tool_call["function"]["arguments"])
+    
+    if arguments.get("interrupt", True):
+        return "wait_for_input"
+    return "agent"
+
+
 async def handle_send_message(state: GraphState) -> GraphState:
     """Handle sendMessage tool call."""
     logger.info("💬 Handling sendMessage")
@@ -312,7 +310,6 @@ async def handle_send_message(state: GraphState) -> GraphState:
     
     message_text = arguments.get("message", "")
     cited_paragraphs = arguments.get("citedParagraphs", [])
-    interrupt_flow = arguments.get("interrupt", True)  # Default to True
     
     # Store cited paragraphs in response for API to extract
     response_content = json.dumps({
@@ -330,18 +327,22 @@ async def handle_send_message(state: GraphState) -> GraphState:
     state["conversation_state"]["messages"].append(tool_response)
     logger.success(f"✅ Message sent: {message_text[:100]}...")
     
-    if interrupt_flow:
-        state["status"] = "waiting_for_input"
-        # Trigger interrupt - graph will pause here
-        new_messages = interrupt("waiting_for_input")
-        
-        # When resumed, add new messages
-        if new_messages:
-            if isinstance(new_messages, list):
-                state["conversation_state"]["messages"].extend(new_messages)
-            else:
-                state["conversation_state"]["messages"].append(new_messages)
+    return state
+
+
+def wait_for_input(state: GraphState) -> GraphState:
+    """Pause graph and wait for user input."""
+    # Trigger interrupt - graph will pause here
+    state["status"] = "waiting_for_input"
+    new_messages = interrupt("waiting_for_input")
     
+    # When resumed, add new messages
+    if new_messages:
+        if isinstance(new_messages, list):
+            state["conversation_state"]["messages"].extend(new_messages)
+        else:
+            state["conversation_state"]["messages"].append(new_messages)
+            
     return state
 
 
@@ -367,6 +368,7 @@ def get_main_graph(checkpointer: Any = None) -> StateGraph:
     graph.add_node("build_tools", build_llm_tools)
     graph.add_node("agent", agent_node)
     graph.add_node("handle_send_message", handle_send_message)
+    graph.add_node("wait_for_input", wait_for_input)
     graph.add_node("route_to_questions", questions_graph)
     graph.add_node("route_to_articles", articles_graph)
     
@@ -386,8 +388,18 @@ def get_main_graph(checkpointer: Any = None) -> StateGraph:
         }
     )
     
-    # After send_message, go back to agent
-    graph.add_edge("handle_send_message", "agent")
+    # After send_message, decide whether to wait or go back
+    graph.add_conditional_edges(
+        "handle_send_message",
+        post_send_message_router,
+        {
+            "wait_for_input": "wait_for_input",
+            "agent": "agent"
+        }
+    )
+    
+    # After waiting, go back to agent
+    graph.add_edge("wait_for_input", "agent")
     
     # After retrieval, go back to agent to process results
     graph.add_edge("route_to_questions", "agent")

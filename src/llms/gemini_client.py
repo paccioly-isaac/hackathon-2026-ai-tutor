@@ -3,7 +3,9 @@
 A streamlined wrapper for Google's Gemini API with retry logic.
 """
 
+import json
 import os
+from datetime import datetime
 from typing import Any, Dict, List, Optional, Type, Union
 
 from google import genai
@@ -143,6 +145,13 @@ class GeminiClient:
                 )
                 
                 self._validate_response(response)
+                self._log_call(
+                    method="call_llm",
+                    model=target_model,
+                    contents=call_content,
+                    config=config_kwargs,
+                    response=response
+                )
                 return response
         
         raise RuntimeError("Max retries exceeded")
@@ -249,6 +258,91 @@ class GeminiClient:
                 response = await chat.send_message(send_content)
                 
                 self._validate_response(response)
+                self._log_call(
+                    method="send_chat_message",
+                    model=target_model,
+                    history=history,
+                    message=send_content,
+                    config=config_kwargs,
+                    response=response
+                )
                 return response
         
+
         raise RuntimeError("Max retries exceeded")
+
+    def _log_call(
+        self,
+        method: str,
+        model: str,
+        config: Dict[str, Any],
+        contents: Any = None,
+        history: Any = None,
+        message: Any = None,
+        response: Any = None,
+    ) -> None:
+        """Log the LLM call to a timestamped file."""
+        try:
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+            log_dir = os.path.join(os.getcwd(), "logs", "gemini")
+            os.makedirs(log_dir, exist_ok=True)
+            
+            filename = f"{timestamp}_{method}.json"
+            filepath = os.path.join(log_dir, filename)
+            
+            # Prepare log data
+            log_data = {
+                "timestamp": datetime.now().isoformat(),
+                "method": method,
+                "model": model,
+                "config": self._serialize_for_log(config),
+                "request": {
+                    "contents": self._serialize_for_log(contents) if contents else None,
+                    "history": self._serialize_for_log(history) if history else None,
+                    "message": self._serialize_for_log(message) if message else None,
+                },
+            }
+            
+            if response:
+                # Safely extract response text or function calls
+                resp_data = {}
+                try:
+                    if hasattr(response, "text"):
+                        resp_data["text"] = response.text
+                except Exception:
+                    pass
+                
+                try:
+                    # Capture tool calls if any
+                    candidates = getattr(response, "candidates", [])
+                    if candidates:
+                        parts = getattr(candidates[0].content, "parts", [])
+                        tool_calls = [
+                            {"name": p.function_call.name, "args": p.function_call.args}
+                            for p in parts if p.function_call
+                        ]
+                        if tool_calls:
+                            resp_data["tool_calls"] = tool_calls
+                except Exception:
+                    pass
+                
+                log_data["response"] = resp_data
+
+            with open(filepath, "w", encoding="utf-8") as f:
+                json.dump(log_data, f, indent=2, ensure_ascii=False)
+                
+        except Exception as e:
+            # Don't let logging failures crash the main process
+            print(f"Error logging Gemini call: {e}")
+
+    def _serialize_for_log(self, obj: Any) -> Any:
+        """Simple serializer for log data."""
+        if hasattr(obj, "to_dict"):
+            return obj.to_dict()
+        if isinstance(obj, (dict, list, str, int, float, bool, type(None))):
+            if isinstance(obj, dict):
+                return {k: self._serialize_for_log(v) for k, v in obj.items()}
+            if isinstance(obj, list):
+                return [self._serialize_for_log(i) for i in obj]
+            return obj
+        return str(obj)
