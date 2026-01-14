@@ -36,6 +36,10 @@ class TutorRequest(BaseModel):
         le=2.0,
         description="Model temperature (0.0-2.0)",
     )
+    session_id: str = Field(
+        ...,
+        description="Session ID for conversation tracking",
+    )
 
     @field_validator("question")
     @classmethod
