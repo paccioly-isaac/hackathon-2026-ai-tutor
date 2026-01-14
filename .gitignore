@@ -247,3 +247,20 @@ frontend/.vite/
 *.njsproj
 *.sln
 *.sw?
+
+# Claude Code Specific Files
+# These files are managed by Claude Code CLI and should not be committed
+.claude/conversations/
+.claude/logs/
+.claude/cache/
+.claude/sessions/
+.claude/.mcp_servers/
+.claude/plans/
+.claude_code_output/
+claude_code.log
+.claude_history
+
+# Keep these Claude Code files in version control:
+# .claude/agents/ - Custom agent definitions (KEEP)
+# .claude/skills/ - Custom skills (KEEP)
+# CLAUDE.md - Global instructions (KEEP, if in project root)
