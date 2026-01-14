@@ -74,6 +74,7 @@ export const useChat = () => {
         },
         questions: response.questions,
         questionsTitle: response.questions_title,
+        cited_paragraphs: response.cited_paragraphs,
       };
 
       setState((prev) => ({

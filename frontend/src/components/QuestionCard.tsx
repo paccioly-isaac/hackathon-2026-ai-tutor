@@ -109,7 +109,7 @@ export const QuestionCard = ({ questions, title, onAnswersChange, onSubmit, exis
                   : isLocked
                     ? 'bg-gray-300 dark:bg-gray-600 text-gray-500 dark:text-gray-400'
                     : isAnswered 
-                      ? 'bg-accent/20 text-accent hover:bg-accent/30' 
+                      ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 hover:bg-blue-200 dark:hover:bg-blue-900/40' 
                       : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-300 dark:hover:bg-gray-600'
                 }`}
               title={`Questão ${idx + 1}${isLocked ? ' (enviada)' : isAnswered ? ' (pendente)' : ''}`}

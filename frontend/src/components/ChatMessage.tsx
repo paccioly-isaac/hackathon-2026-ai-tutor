@@ -140,6 +140,26 @@ export const ChatMessage = ({ message, allQuestions, onAnswersChange, onSubmitAn
         {message.message && (
           <div className="bg-surface-light dark:bg-surface-dark p-4 rounded-2xl rounded-tl-none shadow-sm border border-gray-100 dark:border-gray-700 text-gray-800 dark:text-gray-200 leading-relaxed prose prose-sm max-w-none dark:prose-invert">
             {renderMessage()}
+            
+            {/* Citations */}
+            {message.cited_paragraphs && message.cited_paragraphs.length > 0 && (
+              <div className="mt-2 pt-2 border-t border-gray-100/50 dark:border-gray-800 flex flex-wrap gap-0.5">
+                {message.cited_paragraphs.map((citationId, index) => (
+                  <a 
+                    key={index}
+                    href="https://www.saseducacao.com.br/" 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded text-sm font-medium text-gray-700 dark:text-gray-300 transition-all no-underline group border border-gray-200/50 dark:border-gray-700/50"
+                    title={citationId}
+                    style={{ height: 28, lineHeight: '28px', padding: '0 8px' }}
+                  >
+                    <img src="/sasicon.ico" alt="" className="w-3.5 h-3.5 opacity-80 group-hover:opacity-100 transition-opacity" />
+                    <span className="truncate max-w-[20ch]">{citationId}</span>
+                  </a>
+                ))}
+              </div>
+            )}
           </div>
         )}
         

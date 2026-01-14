@@ -7,6 +7,7 @@ interface ApiTutorResponse {
   tokens_used?: number;
   questions?: Question[];
   questions_title?: string;
+  cited_paragraphs?: string[];
 }
 
 export const tutorApi = {
@@ -18,6 +19,7 @@ export const tutorApi = {
       tokens_used: response.data.tokens_used,
       questions: response.data.questions || [],
       questions_title: response.data.questions_title,
+      cited_paragraphs: response.data.cited_paragraphs || [],
     };
   },
 

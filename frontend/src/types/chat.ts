@@ -27,6 +27,7 @@ export interface ChatMessage {
   };
   questions?: Question[];  // Questions to display with this message
   questionsTitle?: string; // Title for the questions set
+  cited_paragraphs?: string[]; // Cited paragraphs from retrieved content
 }
 
 export interface TutorRequest {
@@ -43,6 +44,7 @@ export interface TutorResponse {
   tokens_used?: number;
   questions?: Question[];  // Questions from the response
   questions_title?: string; // Title for the questions set
+  cited_paragraphs?: string[]; // Cited paragraphs from retrieved content
 }
 
 export interface ChatState {
