@@ -31,6 +31,10 @@ def build_send_message_tool() -> Dict[str, Any]:
                     "type": "array",
                     "items": {"type": "string"},
                     "description": "Optional list of cited paragraphs from retrieved documents."
+                },
+                "interrupt": {
+                    "type": "boolean",
+                    "description": "Whether to interrupt the graph flow to wait for user input (default: true). Set to true when expecting a reply or action from the student."
                 }
             },
             "required": ["message"]

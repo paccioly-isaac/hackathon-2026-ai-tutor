@@ -20,7 +20,6 @@ from loguru import logger
 from src.graphs.state import GraphState, Message
 from src.graphs.tools import (
     build_send_message_tool,
-    build_wait_for_input_tool,
     build_route_to_questions_tool,
     build_route_to_articles_tool,
 )
@@ -44,10 +43,9 @@ SYSTEM_PROMPT = dedent("""
     <tools>
     You have access to the following tools:
     
-    1. sendMessage: Send a response to the student. Include citedParagraphs when referencing retrieved content.
+    1. sendMessage: Send a response to the student. Include citedParagraphs when referencing retrieved content. Set interrupt=True to pause and wait for student response.
     
-    2. waitForInput: When you need additional information from the student, use this to pause and wait for their response.
-    
+
     3. routeToQuestions: When the student wants practice questions, use this to retrieve relevant questions.
     
     4. routeToArticles: When the student wants to learn about a topic, use this to retrieve educational content.
@@ -56,7 +54,8 @@ SYSTEM_PROMPT = dedent("""
     <guidelines>
     - Always be helpful and educational
     - When you retrieve content, cite the relevant paragraphs in your response
-    - If you need clarification, ask the student and use waitForInput
+    - When you retrieve content, cite the relevant paragraphs in your response
+    - If you need clarification, ask the student and use sendMessage with interrupt=True
     - Keep responses clear and appropriately sized
     - Respond in the same language the student uses
     </guidelines>
@@ -68,7 +67,6 @@ def build_llm_tools(state: GraphState) -> GraphState:
     """Build and store tool definitions in state."""
     tools = [
         build_send_message_tool(),
-        build_wait_for_input_tool(),
         build_route_to_questions_tool(),
         build_route_to_articles_tool(),
     ]
@@ -291,8 +289,6 @@ def tool_router(state: GraphState) -> str:
     
     if tool_name == "sendMessage":
         return "handle_send_message"
-    elif tool_name == "waitForInput":
-        return "handle_wait_for_input"
     elif tool_name == "routeToQuestions":
         return "route_to_questions"
     elif tool_name == "routeToArticles":
@@ -316,6 +312,7 @@ async def handle_send_message(state: GraphState) -> GraphState:
     
     message_text = arguments.get("message", "")
     cited_paragraphs = arguments.get("citedParagraphs", [])
+    interrupt_flow = arguments.get("interrupt", True)  # Default to True
     
     # Store cited paragraphs in response for API to extract
     response_content = json.dumps({
@@ -331,49 +328,24 @@ async def handle_send_message(state: GraphState) -> GraphState:
     )
     
     state["conversation_state"]["messages"].append(tool_response)
-    state["status"] = "complete"
     logger.success(f"✅ Message sent: {message_text[:100]}...")
+    
+    if interrupt_flow:
+        state["status"] = "waiting_for_input"
+        # Trigger interrupt - graph will pause here
+        new_messages = interrupt("waiting_for_input")
+        
+        # When resumed, add new messages
+        if new_messages:
+            if isinstance(new_messages, list):
+                state["conversation_state"]["messages"].extend(new_messages)
+            else:
+                state["conversation_state"]["messages"].append(new_messages)
+    
     return state
 
 
-async def handle_wait_for_input(state: GraphState) -> GraphState:
-    """Handle waitForInput tool call - triggers interrupt."""
-    logger.info("⏸️  Handling waitForInput - triggering interrupt")
-    messages = state["conversation_state"]["messages"]
-    assistant_msg = get_last_message(messages, "assistant")
-    
-    if not assistant_msg or not assistant_msg.get("tool_calls"):
-        return state
-    
-    tool_call = assistant_msg["tool_calls"][0]
-    tool_call_id = tool_call["id"]
-    arguments = json.loads(tool_call["function"]["arguments"])
-    
-    reason = arguments.get("reason", "Waiting for user input")
-    
-    # Create tool response before interrupt
-    tool_response = create_tool_message(
-        content=f"Waiting for input: {reason}",
-        role="tool",
-        tool_call_id=tool_call_id,
-        name="waitForInput"
-    )
-    
-    state["conversation_state"]["messages"].append(tool_response)
-    state["status"] = "waiting_for_input"
-    
-    # Trigger interrupt - graph will pause here
-    new_messages = interrupt("waiting_for_input")
-    
-    # When resumed, add new messages
-    if new_messages:
-        if isinstance(new_messages, list):
-            state["conversation_state"]["messages"].extend(new_messages)
-        else:
-            state["conversation_state"]["messages"].append(new_messages)
-    
-    state["status"] = "continue"
-    return state
+
 
 
 def get_main_graph(checkpointer: Any = None) -> StateGraph:
@@ -395,7 +367,6 @@ def get_main_graph(checkpointer: Any = None) -> StateGraph:
     graph.add_node("build_tools", build_llm_tools)
     graph.add_node("agent", agent_node)
     graph.add_node("handle_send_message", handle_send_message)
-    graph.add_node("handle_wait_for_input", handle_wait_for_input)
     graph.add_node("route_to_questions", questions_graph)
     graph.add_node("route_to_articles", articles_graph)
     
@@ -409,18 +380,14 @@ def get_main_graph(checkpointer: Any = None) -> StateGraph:
         tool_router,
         {
             "handle_send_message": "handle_send_message",
-            "handle_wait_for_input": "handle_wait_for_input",
             "route_to_questions": "route_to_questions",
             "route_to_articles": "route_to_articles",
             "end": END
         }
     )
     
-    # After send_message, end
-    graph.add_edge("handle_send_message", END)
-    
-    # After wait_for_input, go back to agent with new messages
-    graph.add_edge("handle_wait_for_input", "agent")
+    # After send_message, go back to agent
+    graph.add_edge("handle_send_message", "agent")
     
     # After retrieval, go back to agent to process results
     graph.add_edge("route_to_questions", "agent")
