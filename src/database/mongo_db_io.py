@@ -173,7 +173,6 @@ def upload_asset_to_mongo(
             "error": str(e),
         }
 
-
 def vector_search(
     client: MongoClient,
     database_name: str,
@@ -185,6 +184,7 @@ def vector_search(
     top_k: int,
     num_candidates: int | None = None,
     filter: dict[str, Any] | None = None,
+    projection: list[str] | None = None,
 ) -> list[dict[str, Any]]:
     """
     Perform semantic vector search on a MongoDB Atlas collection.
@@ -207,6 +207,8 @@ def vector_search(
         filter: Optional pre-filter conditions to apply before vector search.
             Only documents matching the filter will be considered.
             Must use indexed fields. Example: {"category": "tutorial", "year": {"$gte": 2020}}
+        projection: Optional list of field names to return. If None, returns all fields.
+            Example: ["text", "title", "_id"] to return only those fields.
 
     Returns:
         list[dict[str, Any]]: List of documents sorted by similarity (highest first).
@@ -272,14 +274,16 @@ def vector_search(
         vector_search_stage["$vectorSearch"]["filter"] = filter
         logger.info(f"Applying pre-filter: {filter}")
 
-    # Add projection stage to include vectorSearchScore
-    project_stage = {
-        "$project": {
-            "vectorSearchScore": {"$meta": "vectorSearchScore"},
-            # Include all document fields (MongoDB includes all fields by default, but we
-            # explicitly request vectorSearchScore via $meta)
-        }
+    # Add projection stage to include vectorSearchScore and optionally limit fields
+    project_spec: dict[str, Any] = {
+        "vectorSearchScore": {"$meta": "vectorSearchScore"},
     }
+    if projection is not None:
+        # Include only specified fields
+        for field in projection:
+            project_spec[field] = 1
+        logger.info(f"Projecting fields: {projection}")
+    project_stage = {"$project": project_spec}
 
     pipeline = [vector_search_stage, project_stage]
 
@@ -302,3 +306,87 @@ def vector_search(
     except Exception as e:
         logger.error(f"Vector search failed: {e}")
         raise Exception(f"Failed to execute vector search: {e}")
+
+
+def search_content(
+    client: MongoClient,
+    search_query: str,
+    embedder: Embedder,
+    top_k: int,
+    config: ContentInput | None = None,
+    num_candidates: int | None = None,
+    filter: dict[str, Any] | None = None,
+) -> list[ContentOutput]:
+    """
+    Search for educational content using vector similarity.
+
+    Args:
+        client: MongoClient instance connected to MongoDB Atlas.
+        search_query: Text query to search for.
+        embedder: Embedder instance to generate query embedding.
+        top_k: Number of results to return.
+        config: ContentInput with database configuration (uses defaults if not provided).
+        num_candidates: Optional number of candidates for ANN search.
+        filter: Optional pre-filter conditions.
+
+    Returns:
+        list[ContentOutput]: List of content documents sorted by similarity.
+    """
+    if config is None:
+        config = ContentInput()
+    results = vector_search(
+        client=client,
+        database_name=config.database_name,
+        collection_name=config.collection_name,
+        search_query=search_query,
+        embedder=embedder,
+        vector_field_path=config.vector_field_path,
+        vector_index_name=config.vector_index_name,
+        top_k=top_k,
+        num_candidates=num_candidates,
+        filter=filter,
+        projection=["_id", "image_ref", "text"],
+    )
+    return [ContentOutput.model_validate(doc) for doc in results]
+
+
+def search_questions(
+    client: MongoClient,
+    search_query: str,
+    embedder: Embedder,
+    top_k: int,
+    config: QuestionInput | None = None,
+    num_candidates: int | None = None,
+    filter: dict[str, Any] | None = None,
+) -> list[QuestionOutput]:
+    """
+    Search for questions using vector similarity.
+
+    Args:
+        client: MongoClient instance connected to MongoDB Atlas.
+        search_query: Text query to search for.
+        embedder: Embedder instance to generate query embedding.
+        top_k: Number of results to return.
+        config: QuestionInput with database configuration (uses defaults if not provided).
+        num_candidates: Optional number of candidates for ANN search.
+        filter: Optional pre-filter conditions.
+
+    Returns:
+        list[QuestionOutput]: List of question documents sorted by similarity.
+    """
+    if config is None:
+        config = QuestionInput()
+    results = vector_search(
+        client=client,
+        database_name=config.database_name,
+        collection_name=config.collection_name,
+        search_query=search_query,
+        embedder=embedder,
+        vector_field_path=config.vector_field_path,
+        vector_index_name=config.vector_index_name,
+        top_k=top_k,
+        num_candidates=num_candidates,
+        filter=filter,
+        projection=["questionId", "text", "options", "resolution"],
+    )
+    return [QuestionOutput.model_validate(doc) for doc in results]

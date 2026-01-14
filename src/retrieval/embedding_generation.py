@@ -630,7 +630,7 @@ class OpenAIEmbedder(Embedder):
         self,
         api_key: str | None = None,
         model: str = "text-embedding-3-large",
-        dimensions: int | None = None,
+        dimensions: int | None = 1024,
         max_retries: int = 15,
         restart_client_on_error: bool = True,
     ):

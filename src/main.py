@@ -13,6 +13,7 @@ from fastapi.responses import JSONResponse
 from src.config import settings
 from src.api.routes import ai
 from src.models.schemas import HealthResponse
+from src.database.mongo_db_io import connect_to_mongo
 
 
 class AITutorException(Exception):
@@ -35,7 +36,26 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Application lifespan manager for startup and shutdown events."""
     print(f"Starting {settings.app_name} v{settings.app_version}")
     print(f"Debug mode: {settings.debug}")
+
+    # Initialize MongoDB clients
+    app.state.question_db_client = None
+    app.state.content_db_client = None
+
+    if settings.question_db_uri:
+        app.state.question_db_client = connect_to_mongo(settings.question_db_uri)
+        print("Question DB client initialized")
+
+    if settings.content_db_uri:
+        app.state.content_db_client = connect_to_mongo(settings.content_db_uri)
+        print("Content DB client initialized")
+
     yield
+
+    # Cleanup MongoDB connections
+    if app.state.question_db_client:
+        app.state.question_db_client.close()
+    if app.state.content_db_client:
+        app.state.content_db_client.close()
     print("Shutting down application")
 
 
