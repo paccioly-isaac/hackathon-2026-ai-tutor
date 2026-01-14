@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { tutorApi } from '../api/tutor';
-import { ChatMessage, ChatState } from '../types/chat';
+import type { ChatMessage, ChatState } from '../types/chat';
 import { v4 as uuidv4 } from 'uuid';
 
 export const useChat = () => {

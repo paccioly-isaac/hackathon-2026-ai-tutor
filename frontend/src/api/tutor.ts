@@ -1,5 +1,5 @@
 import { apiClient } from './client';
-import { TutorRequest, TutorResponse } from '../types/chat';
+import type { TutorRequest, TutorResponse } from '../types/chat';
 
 export const tutorApi = {
   async sendMessage(request: TutorRequest): Promise<TutorResponse> {

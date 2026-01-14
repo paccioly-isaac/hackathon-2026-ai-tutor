@@ -34,15 +34,19 @@ def get_graph():
 # Pydantic models for request/response
 class AskRequest(BaseModel):
     """Request to ask the AI tutor a question."""
-    conversation_id: str = Field(..., description="Unique conversation identifier")
-    message: str = Field(..., description="Student's message/question")
+    session_id: str = Field(..., description="Unique conversation identifier")
+    question: str = Field(..., description="Student's message/question")
+    context: Optional[str] = Field(default=None, description="Additional context for the question")
+    temperature: Optional[float] = Field(default=None, description="Model temperature override")
     user_id: str = Field(default="hackathon_judge", description="User identifier (mocked)")
 
 
 class AskResponse(BaseModel):
     """Response from the AI tutor."""
-    conversation_id: str
-    message: str = Field(..., description="AI tutor's response message")
+    answer: str = Field(..., description="AI tutor's response message")
+    model_used: str = Field(default="gemini-3-flash-preview", description="Model used for generation")
+    tokens_used: Optional[int] = Field(default=0, description="Token usage count")
+    session_id: str
     cited_paragraphs: List[str] = Field(default_factory=list, description="Cited paragraphs from retrieved content")
     waiting_for_input: bool = Field(default=False, description="Whether the agent is waiting for more input")
 
@@ -73,18 +77,18 @@ async def ask_tutor(request: AskRequest) -> AskResponse:
     3. Runs the graph until completion or interrupt
     4. Returns the latest response with citations
     """
-    logger.info(f"💬 New request: conversation_id={request.conversation_id}")
-    logger.debug(f"Message: {request.message[:100]}...")
+    logger.info(f"💬 New request: session_id={request.session_id}")
+    logger.debug(f"Question: {request.question[:100]}...")
     
     try:
         graph = get_graph()
-        config = {"configurable": {"thread_id": request.conversation_id}}
+        config = {"configurable": {"thread_id": request.session_id}}
         
         # Create user message
         user_message: Message = {
             "role": "user",
-            "content": request.message,
-            "id": f"msg_{request.conversation_id}_{len(request.message)}"
+            "content": request.question,
+            "id": f"msg_{request.session_id}_{len(request.question)}"
         }
         
         # Check if this is a new conversation or resuming
@@ -94,7 +98,7 @@ async def ask_tutor(request: AskRequest) -> AskResponse:
         if is_first_execution:
             # New conversation - create initial state
             initial_state = get_initial_state(
-                conversation_id=request.conversation_id,
+                conversation_id=request.session_id,
                 messages=[user_message],
             )
             result = await run_or_resume_graph(
@@ -137,10 +141,12 @@ async def ask_tutor(request: AskRequest) -> AskResponse:
                     break
         
         return AskResponse(
-            conversation_id=request.conversation_id,
-            message=response_message or "I'm processing your request...",
+            session_id=request.session_id,
+            answer=response_message or "I'm processing your request...",
             cited_paragraphs=cited_paragraphs,
             waiting_for_input=graph_status == "waiting_for_input",
+            model_used="gemini-3-flash-preview",
+            tokens_used=0 # Placeholder
         )
         
     except Exception as e:
