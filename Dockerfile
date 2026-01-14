@@ -2,7 +2,7 @@
 # Using slim (Debian) instead of Alpine for better compatibility with scientific packages
 FROM python:3.13-slim AS builder
 
-WORKDIR /usr/src/project
+WORKDIR /usr/src/app
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
@@ -35,41 +35,33 @@ RUN --mount=type=cache,target=/var/.cache/uv \
 # Runtime stage - minimal image
 FROM python:3.13-slim
 
-WORKDIR /usr/src/project
+WORKDIR /usr/src/app
 
-ARG WITH_NEW_RELIC=false
 ARG APP_VERSION=latest
 
-ENV APP_NAME=ia-lms-redacoes \
+ENV APP_NAME=agentic-ai-tutor \
     APP_VERSION=$APP_VERSION \
-    WITH_NEW_RELIC=$WITH_NEW_RELIC \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     UV_PROJECT_ENVIRONMENT=/usr/src/.venv \
-    SRC_CODE_PATH=/usr/src/project
+    SRC_CODE_PATH=/usr/src/app
 
 # Install runtime dependencies
-# - libffi8, libssl3: for cryptography
-# - libgl1, libglib2.0-0: for opencv-python-headless
-# - libjpeg62, libpng16-16, zlib1g: for pillow image processing
+# - libffi8, libssl3: for cryptography and SSL connections
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libffi8 \
     libssl3 \
-    libgl1 \
-    libglib2.0-0 \
-    libjpeg62-turbo \
-    libpng16-16 \
-    zlib1g \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy the virtual environment from builder
 COPY --from=builder /usr/src/.venv /usr/src/.venv
 
-# Add venv bin to PATH
-ENV PATH="${UV_PROJECT_ENVIRONMENT}/bin:${PATH}"
+# Add venv bin to PATH and project root to PYTHONPATH (for src.* imports)
+ENV PATH="${UV_PROJECT_ENVIRONMENT}/bin:${PATH}" \
+    PYTHONPATH="/usr/src/app:${PYTHONPATH}"
 
 # Copy application code
 COPY ./ ./
 
 # Run FastAPI server with uvicorn
-CMD ["uvicorn", "ia_lms_redacoes.api.server:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000"]
