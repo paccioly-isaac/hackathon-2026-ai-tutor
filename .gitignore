@@ -259,6 +259,7 @@ frontend/.vite/
 .claude_code_output/
 claude_code.log
 .claude_history
+.claude/*
 
 # Keep these Claude Code files in version control:
 # .claude/agents/ - Custom agent definitions (KEEP)
