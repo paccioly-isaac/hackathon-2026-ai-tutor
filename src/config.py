@@ -39,6 +39,10 @@ class Settings(BaseSettings):
     api_key: Optional[str] = None
     openai_api_key: Optional[str] = None
 
+    # MongoDB Configuration
+    question_db_uri: Optional[str] = None  # TODO: set QUESTION_DB_URI in .env
+    content_db_uri: Optional[str] = None  # TODO: set CONTENT_DB_URI in .env
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

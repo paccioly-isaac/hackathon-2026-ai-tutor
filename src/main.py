@@ -12,6 +12,8 @@ from fastapi.responses import JSONResponse
 
 from src.config import settings
 from src.api.routes import ai
+from src.models.schemas import HealthResponse
+from src.database.mongo_db_io import connect_to_mongo
 
 
 class AITutorException(Exception):
@@ -34,7 +36,26 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Application lifespan manager for startup and shutdown events."""
     print(f"Starting {settings.app_name} v{settings.app_version}")
     print(f"Debug mode: {settings.debug}")
+
+    # Initialize MongoDB clients
+    app.state.question_db_client = None
+    app.state.content_db_client = None
+
+    if settings.question_db_uri:
+        app.state.question_db_client = connect_to_mongo(settings.question_db_uri)
+        print("Question DB client initialized")
+
+    if settings.content_db_uri:
+        app.state.content_db_client = connect_to_mongo(settings.content_db_uri)
+        print("Content DB client initialized")
+
     yield
+
+    # Cleanup MongoDB connections
+    if app.state.question_db_client:
+        app.state.question_db_client.close()
+    if app.state.content_db_client:
+        app.state.content_db_client.close()
     print("Shutting down application")
 
 
@@ -92,11 +113,32 @@ async def general_exception_handler(request: Request, exc: Exception) -> JSONRes
 app.include_router(ai.router, prefix=settings.api_v1_prefix)
 
 
-# Health check endpoint
-@app.get("/health", tags=["health"])
-async def health_check() -> dict:
+# Health check endpoints
+@app.get("/health", tags=["health"], response_model=HealthResponse)
+async def health_check() -> HealthResponse:
     """Health check endpoint."""
-    return {"status": "healthy", "version": settings.app_version}
+    return HealthResponse(
+        status="healthy",
+        version=settings.app_version,
+        model_loaded=True,  # In production, check if models are actually loaded
+    )
+
+
+@app.get("/api/v1/health", tags=["health"], response_model=HealthResponse)
+async def health_check_v1() -> HealthResponse:
+    """Health check endpoint (API v1)."""
+    return HealthResponse(
+        status="healthy",
+        version=settings.app_version,
+        model_loaded=True,
+    )
+
+
+@app.get("/api/v1/ready", tags=["health"])
+async def readiness_check() -> dict:
+    """Readiness check endpoint."""
+    # In production, check database connections, model loading, etc.
+    return {"status": "ready"}
 
 
 # Root endpoint

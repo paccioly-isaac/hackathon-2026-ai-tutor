@@ -5,27 +5,11 @@ authentication, and other shared resources.
 """
 
 from typing import Annotated
-from fastapi import Depends, Header, HTTPException, status
-from app.services.ai_service import AIService, get_ai_service
-from app.config import settings
 
+from fastapi import Depends, Header, HTTPException, Request, status
+from pymongo.mongo_client import MongoClient
 
-def get_ai_service_dependency() -> AIService:
-    """Dependency for injecting AI service into route handlers.
-
-    Returns:
-        AIService instance
-
-    Raises:
-        HTTPException: If service initialization fails
-    """
-    try:
-        return get_ai_service(model_name=settings.model_name)
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=f"AI service unavailable: {str(e)}",
-        ) from e
+from src.config import settings
 
 
 async def verify_api_key(
@@ -51,6 +35,29 @@ async def verify_api_key(
         )
 
 
+def get_question_db_client(request: Request) -> MongoClient:
+    """Get the Question DB MongoDB client from app state."""
+    client = request.app.state.question_db_client
+    if client is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Question database not configured",
+        )
+    return client
+
+
+def get_content_db_client(request: Request) -> MongoClient:
+    """Get the Content DB MongoDB client from app state."""
+    client = request.app.state.content_db_client
+    if client is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Content database not configured",
+        )
+    return client
+
+
 # Type aliases for dependency injection
-AIServiceDep = Annotated[AIService, Depends(get_ai_service_dependency)]
 APIKeyDep = Annotated[None, Depends(verify_api_key)]
+QuestionDBClient = Annotated[MongoClient, Depends(get_question_db_client)]
+ContentDBClient = Annotated[MongoClient, Depends(get_content_db_client)]
